@@ -1,7 +1,7 @@
 """Prediction of phases on membrane simulations."""
 
 # Add imports here
-from .core import *
+from .mpp import *
 
 # Handle versioneer
 from ._version import get_versions
