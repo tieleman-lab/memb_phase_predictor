@@ -14,7 +14,15 @@ dependencies:
   - pytest-cov
   - codecov
 
+    # Package dependencies
+  - mdanalysis  
+  - pandas
+  - tqdm
+  - numpy
+  - sklearn
+
     # Pip-only installs
-  #- pip:
-  #  - codecov
+  - pip:
+   - lipyphilic
+   - hmmlearn
 
