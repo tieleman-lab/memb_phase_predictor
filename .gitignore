@@ -109,3 +109,7 @@ ENV/
 single_scripts/
 
 .DS_Store
+memb_phase_predictor/data/cg_good.gro
+memb_phase_predictor/data/cg.xtc
+memb_phase_predictor/data/DPPC_DOPC_280K.gro
+memb_phase_predictor/data/DPPC_DOPC_280K.xtc
