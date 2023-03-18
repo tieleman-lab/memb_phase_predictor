@@ -113,3 +113,13 @@ memb_phase_predictor/data/cg_good.gro
 memb_phase_predictor/data/cg.xtc
 memb_phase_predictor/data/DPPC_DOPC_280K.gro
 memb_phase_predictor/data/DPPC_DOPC_280K.xtc
+memb_phase_predictor/data/.cg.xtc_offsets.npz
+memb_phase_predictor/data/.DPPC_DOPC_280K.xtc_offsets.npz
+memb_phase_predictor/data/results/HMM/lipid_order_0.npy
+memb_phase_predictor/data/results/HMM/lipid_order_1.npy
+memb_phase_predictor/data/results/HMM/observations_lower.pkl
+memb_phase_predictor/data/results/HMM/observations_upper.pkl
+memb_phase_predictor/data/results/leaflets/leaflets.pkl
+scripts/results/leaflets/leaflets.pkl
+memb_phase_predictor/data/results/order_parameters/order_parameters.pkl
+memb_phase_predictor/data/results/HMM/summary.txt
