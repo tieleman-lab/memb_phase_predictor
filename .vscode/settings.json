@@ -1,0 +1,7 @@
+{
+    "python.testing.pytestArgs": [
+        "memb_phase_predictor"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

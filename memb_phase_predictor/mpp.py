@@ -17,10 +17,11 @@ from lipyphilic.lib.order_parameter import SCC
 
 
 class Predictor():
-    def __init__(self, structure, trajectory, begin=-1000, skip=50, b_type='triclinic'):
+    def __init__(self, structure, trajectory, begin=0, skip=1, b_type='triclinic'):
         self.universe = mda.Universe(structure, trajectory)
         if b_type == 'triclinic':
-            self.universe.add_transformations(triclinic_to_orthorhombic(ag=self.universe.select_atoms('resname DPPC DOPC')))
+            self.universe.trajectory.add_transformations(triclinic_to_orthorhombic(ag=self.universe.select_atoms('resname DPPC DOPC')))
+        self.membrane = self.universe.select_atoms('resname DPPC DOPC')
         self.nframes = self.universe.trajectory.n_frames
         self.leaflets = None
         self.lip_state_lower = None
@@ -29,7 +30,6 @@ class Predictor():
         self.N = 5
         self.begin = begin
         self.skip = skip
-    
 
     def itentify_membrane_leaflets(self, glycerol_chain = 'name GL1 GL2', n_bins=10, save=True):
         print('\nAssigning lipids to leaflets....')
@@ -46,16 +46,21 @@ class Predictor():
             with open(filename, 'wb') as f:
                 pickle.dump(self.leaflets, f)
 
+    def load_leaflet_data(self, leaflets_file):
+        with open(leaflets_file, 'rb') as f:
+            self.leaflets = pickle.load(f)
+        self.lip_state_lower = np.full((np.count_nonzero(self.leaflets.leaflets[:,-1] == -1), len(self.universe.trajectory[self.begin::self.skip])), '11')
+        self.lip_state_upper = np.full((np.count_nonzero(self.leaflets.leaflets[:,-1] == 1), len(self.universe.trajectory[self.begin::self.skip])), '11')
 
     def calculate_order_parameters(self, tail1 = 'name ??A', tail2 = 'name ??B', save=True):
         print('\nCalculating order parameters....')
         # tail1
         scc_sn1 = SCC(universe = self.universe, tail_sel = tail1)
-        print('tail1....\n')
+        print('tail1....')
         scc_sn1.run(start=None, stop=None, step=None, verbose=True)
         # tail2
         scc_sn2 = SCC(universe = self.universe, tail_sel = tail2)
-        print('tail2....\n')
+        print('tail2....')
         scc_sn2.run(start=None, stop=None, step=None, verbose=True)
         self.scc = SCC.weighted_average(scc_sn1, scc_sn2)
         if save:
@@ -66,6 +71,9 @@ class Predictor():
             with open(filename, 'wb') as f:
                 pickle.dump(self.scc, f)
 
+    def load_order_parameters(self, order_parameters_file):
+        with open(order_parameters_file, 'rb') as f:
+            self.scc = pickle.load(f)
 
     def cal_xycom(self, leaflet_group):
         # function to calculate center of mass
@@ -120,12 +128,12 @@ class Predictor():
             box = ts.dimensions
 
             #residues in lower and upper leaflets
-            lower_leaflet_residues = self.universe.residues[self.leaflets.leaflets[:,-1] == -1]
-            upper_leaflet_residues = self.universe.residues[self.leaflets.leaflets[:,-1] == 1]
+            lower_leaflet_residues = self.membrane.residues[self.leaflets.leaflets[:,-1] == -1]
+            upper_leaflet_residues = self.membrane.residues[self.leaflets.leaflets[:,-1] == 1]
 
             #cal com of lipids
-            lip_com1 = self.cal_xycom(self.lower_leaflet_residues)
-            lip_com2 = self.cal_xycom(self.upper_leaflet_residues)
+            lip_com1 = self.cal_xycom(lower_leaflet_residues)
+            lip_com2 = self.cal_xycom(upper_leaflet_residues)
 
             #print lip_res
             lip_com1 = lip_com1.astype(np.float32)
@@ -154,6 +162,11 @@ class Predictor():
             with open(filename, 'wb') as f:
                 pickle.dump(self.lip_state_upper, f)
 
+    def load_observations(self, observations_file_lower, observations_file_upper):
+        with open(observations_file_lower, 'rb') as f:
+            self.lip_state_lower = pickle.load(f)
+        with open(observations_file_upper, 'rb') as f:
+            self.lip_state_upper = pickle.load(f)
 
     def train_hmm(self, replicates, save=True):
         print('\nTraining HMM....')
@@ -175,7 +188,7 @@ class Predictor():
 
         for k in range(0, replicates):
             # This is our output array 
-            lipid_order = np.zeros((len(self.universe.residues), len(self.universe.trajectory[self.begin::self.skip])), dtype=np.int8)
+            lipid_order = np.zeros((len(self.membrane.residues), len(self.universe.trajectory[self.begin::self.skip])), dtype=np.int8)
             #define start probabilities
             temp = random.random()
             start_probabilities_init = np.array([temp, 1-temp])
@@ -189,7 +202,7 @@ class Predictor():
             emission_probabilities_init = np.divide(temp, temp_sum) 
 
             #define the model
-            hmodel = hmm.MultinomialHMM(n_components = n_states, algorithm = 'viterbi', n_iter = 10000, tol = 0.00005)
+            hmodel = hmm.CategoricalHMM(n_components = n_states, algorithm = 'viterbi', n_iter = 10000, tol = 0.00005)
             hmodel.startprob_ = start_probabilities_init
             hmodel.transmat_ = transition_probabilities_init
             hmodel.emismatprob_ = emission_probabilities_init
@@ -201,7 +214,7 @@ class Predictor():
             #in order to fullfill the aforementioned requirements
             #another solution is to assign numbers based on the states manually
             length_seq = []
-            for i in range(0, len(self.universe.residues)):
+            for i in range(0, len(self.membrane.residues)):
                 length_seq.append(len(self.universe.trajectory[self.begin::self.skip]))
             
             state_seq = state_transform.reshape(state_transform.shape[0], 1).astype(np.int8)
@@ -213,7 +226,7 @@ class Predictor():
             print(hmodel.monitor_.converged)
             
             #reshape the state_predic array
-            state_predic = state_predic.reshape(len(self.universe.residues), int(len(state_predic)/len(self.universe.residues))).T
+            state_predic = state_predic.reshape(len(self.membrane.residues), int(len(state_predic)/len(self.membrane.residues))).T
             #dump the data   
             for i in range(0, state_predic.shape[0]):
                 for j in range(0, state_predic.shape[1]):
@@ -238,8 +251,8 @@ class Predictor():
             # Different composition between the phases
             df_content = pd.DataFrame({'Phase': [], 'DPPC': [], 'DOPC': []})
             #residues in lower and upper leaflets
-            lower_leaflet_residues = self.universe.residues[self.leaflets.leaflets[:,-1] == -1]
-            upper_leaflet_residues = self.universe.residues[self.leaflets.leaflets[:,-1] == 1]
+            lower_leaflet_residues = self.membrane.residues[self.leaflets.leaflets[:,-1] == -1]
+            upper_leaflet_residues = self.membrane.residues[self.leaflets.leaflets[:,-1] == 1]
             for phase in [-1, 1]:
                 count_dppc = []
                 count_dopc = []
@@ -262,9 +275,12 @@ class Predictor():
             dopc_gel = df_content.iat[1,2]/(df_content.iat[1,1] + df_content.iat[1,2])
 
             f = open(results_directory.joinpath('summary.txt'), 'w')
-            f.write(str(round(dppc_gel, 3)) + ':' + str(round(dopc_gel, 3)) + '\t' + str(round(dppc_La, 3)) + ':' + str(round(dopc_La, 3)))
+            f.write('### Ratio DPPC:DOPC -average over the last microsecond- ###\n')
+            f.write('Phase1 (more-ordered) \t Phase2 (more-disordered)\n')
+            f.write(str(round(dppc_gel, 3)) + ':' + str(round(dopc_gel, 3)) + '\t\t\t\t\t' + str(round(dppc_La, 3)) + ':' + str(round(dopc_La, 3)))
             f.write('\n')
             f.close()
+        print('Done!')
 
 
 
