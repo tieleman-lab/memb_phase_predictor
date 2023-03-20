@@ -19,7 +19,7 @@ dependencies:
   - pandas
   - tqdm
   - numpy
-  - sklearn
+  - scikit-learn
   - hmmlearn
   - lipyphilic
 
