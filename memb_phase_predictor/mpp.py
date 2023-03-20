@@ -17,7 +17,7 @@ from lipyphilic.lib.order_parameter import SCC
 
 
 class Predictor():
-    def __init__(self, structure, trajectory, begin=-1000, skip=25, b_type='triclinic'):
+    def __init__(self, structure, trajectory, begin=0, skip=1, b_type='triclinic'):
         self.universe = mda.Universe(structure, trajectory)
         if b_type == 'triclinic':
             self.universe.trajectory.add_transformations(triclinic_to_orthorhombic(ag=self.universe.select_atoms('resname DPPC DOPC')))
